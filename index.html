@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Control de Proyectos</title>
+<style>
+/* ── Reset & Variables ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary:    #4A90D9;
+  --primary-dk: #2c6fad;
+  --alta:       #e74c3c;
+  --media:      #f39c12;
+  --baja:       #27ae60;
+  --bg:         #f0f4f8;
+  --card:       #ffffff;
+  --text:       #1a202c;
+  --muted:      #718096;
+  --border:     #cbd5e0;
+  --radius:     10px;
+
+  /* Estado — fondo de fila */
+  --pendiente-bg:  #bfc6ce;
+  --encurso-bg:    #5ba5e8;
+  --testing-bg:    #b47fee;
+  --completada-bg: #3dba6f;
+
+  /* Estado — badge */
+  --pendiente-badge:  #7f8c8d;
+  --encurso-badge:    #2980b9;
+  --testing-badge:    #8e44ad;
+  --completada-badge: #1e8449;
+
+  /* Vencimiento */
+  --vok:     #1e8449;
+  --vpronto: #d68910;
+  --vurg:    #ca6f1e;
+  --vcrit:   #c0392b;
+}
+
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Header ── */
+header {
+  background: var(--primary);
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  position: sticky; top: 0; z-index: 50;
+}
+header h1 { font-size: clamp(1rem, 3vw, 1.35rem); font-weight: 700; }
+.btn-nueva {
+  background: #fff; color: var(--primary);
+  border: none; padding: 8px 16px; border-radius: 20px;
+  font-weight: 700; font-size: 0.88rem; cursor: pointer;
+  white-space: nowrap; transition: transform .1s, box-shadow .1s;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
+}
+.btn-nueva:hover { transform: scale(1.04); box-shadow: 0 4px 10px rgba(0,0,0,.18); }
+
+/* ── Filtros ── */
+.filters {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 14px 20px 8px;
+  align-items: center;
+}
+.filters select, .filters input[type=text] {
+  padding: 8px 11px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 0.85rem; background: #fff;
+  color: var(--text); outline: none; width: 100%;
+}
+.filters select:focus, .filters input:focus { border-color: var(--primary); }
+.filter-item { flex: 1 1 140px; min-width: 120px; }
+.filter-search { flex: 2 1 200px; }
+.badge-count { font-size: 0.82rem; color: var(--muted); white-space: nowrap; align-self: center; padding: 0 4px; }
+
+/* ── Leyenda de estados ── */
+.leyenda {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 4px 20px 12px;
+}
+.ley-item {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.75rem; color: var(--muted);
+}
+.ley-dot {
+  width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+}
+
+/* ── Cards (mobile) ── */
+.cards-wrap { padding: 0 14px 80px; display: flex; flex-direction: column; gap: 10px; }
+
+.task-card {
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0,0,0,.10);
+  overflow: hidden;
+  transition: transform .15s, box-shadow .15s;
+}
+.task-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.14); }
+
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 8px;
+  gap: 8px;
+}
+.card-title { font-weight: 700; font-size: 0.95rem; flex: 1; }
+.card-desc  { font-size: 0.78rem; color: rgba(0,0,0,.55); margin-top: 2px; }
+.card-body  { padding: 0 14px 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.card-meta  { font-size: 0.78rem; color: rgba(0,0,0,.6); display: flex; align-items: center; gap: 4px; }
+.card-footer {
+  padding: 8px 14px;
+  background: rgba(0,0,0,.06);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Tabla (desktop) ── */
+.table-wrap { padding: 0 20px 60px; overflow-x: auto; display: none; }
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: var(--radius); overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.09); }
+thead tr { background: var(--primary); color: #fff; }
+thead th { padding: 12px 14px; text-align: left; font-size: 0.8rem; font-weight: 700; letter-spacing: .03em; white-space: nowrap; }
+tbody tr { border-bottom: 1px solid rgba(0,0,0,.06); transition: filter .15s; }
+tbody tr:hover { filter: brightness(.96); }
+tbody td { padding: 11px 14px; font-size: 0.87rem; vertical-align: middle; }
+/* Borde lateral por estado */
+tbody tr td:first-child { border-left: 5px solid transparent; }
+tr.est-Pendiente  td:first-child { border-left-color: var(--pendiente-badge); }
+tr.est-En-curso   td:first-child { border-left-color: var(--encurso-badge); }
+tr.est-Testing    td:first-child { border-left-color: var(--testing-badge); }
+tr.est-Completada td:first-child { border-left-color: var(--completada-badge); }
+
+/* ── Colores de fila / card por estado ── */
+.est-Pendiente  { background: var(--pendiente-bg) !important; }
+.est-En-curso   { background: var(--encurso-bg)   !important; color: #fff !important; }
+.est-Testing    { background: var(--testing-bg)   !important; color: #fff !important; }
+.est-Completada { background: var(--completada-bg)!important; color: #fff !important; }
+
+/* texto oscuro sobre fondo claro */
+.est-Pendiente .card-desc,
+.est-Pendiente .card-meta  { color: rgba(0,0,0,.55) !important; }
+/* texto blanco sobre fondos oscuros */
+.est-En-curso .card-desc,  .est-En-curso .card-meta,
+.est-Testing .card-desc,   .est-Testing .card-meta,
+.est-Completada .card-desc,.est-Completada .card-meta { color: rgba(255,255,255,.8) !important; }
+.est-En-curso .card-footer,
+.est-Testing .card-footer,
+.est-Completada .card-footer { background: rgba(0,0,0,.12) !important; }
+
+/* Tachado completada */
+.est-Completada .card-title,
+tr.est-Completada td:nth-child(2) div:first-child { text-decoration: line-through; opacity: .75; }
+
+/* Urgencia vencimiento sobreescribe fondo */
+.venc-urgente-row { background: #f9a825 !important; color: #1a202c !important; }
+.venc-critico-row { background: #e53935 !important; color: #fff     !important; }
+.venc-vencida-row { background: #b71c1c !important; color: #fff     !important; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 0.74rem; font-weight: 700; color: #fff; white-space: nowrap;
+}
+.badge-Alta       { background: var(--alta); }
+.badge-Media      { background: var(--media); }
+.badge-Baja       { background: var(--baja); }
+.badge-Pendiente  { background: var(--pendiente-badge); }
+.badge-En-curso   { background: var(--encurso-badge); }
+.badge-Testing    { background: var(--testing-badge); }
+.badge-Completada { background: var(--completada-badge); }
+
+/* ── Selector de estado inline ── */
+.estado-sel {
+  border: none; border-radius: 6px;
+  padding: 4px 8px; font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; color: #fff;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,.7)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center; padding-right: 22px;
+}
+.sel-Pendiente  { background-color: var(--pendiente-badge); }
+.sel-En-curso   { background-color: var(--encurso-badge); }
+.sel-Testing    { background-color: var(--testing-badge); }
+.sel-Completada { background-color: var(--completada-badge); }
+.estado-sel option { background: #333; color: #fff; }
+
+/* Acciones */
+.actions { display: flex; gap: 5px; }
+.btn-icon { border: none; background: rgba(0,0,0,.1); cursor: pointer; padding: 5px 8px; border-radius: 6px; font-size: 1rem; transition: background .15s; }
+.btn-icon:hover { background: rgba(0,0,0,.22); }
+
+/* Fecha */
+.venc-ok      { font-weight: 600; color: var(--vok); }
+.venc-pronto  { font-weight: 600; color: var(--vpronto); }
+.venc-urgente { font-weight: 700; color: var(--vurg); }
+.venc-critico { font-weight: 700; color: var(--vcrit); }
+.venc-vencida { font-weight: 700; color: #7b0000; }
+.venc-ok-w, .venc-pronto-w, .venc-urgente-w, .venc-critico-w, .venc-vencida-w { font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+
+
+/* ── Loading / Empty ── */
+.loading, .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #ddd; border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-left: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Modal ── */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+.overlay.open { display: flex; }
+.modal { background: #fff; border-radius: var(--radius); padding: 24px 24px 20px; width: 100%; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,.2); max-height: 90vh; overflow-y: auto; }
+.modal h2 { margin-bottom: 18px; font-size: 1.1rem; color: var(--primary); }
+.form-group { margin-bottom: 13px; }
+.form-group label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: #4a5568; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 0.9rem; color: var(--text); outline: none; font-family: inherit; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
+.form-group textarea { resize: vertical; min-height: 65px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.btn-cancel { padding: 9px 18px; border: 1.5px solid var(--border); background: #fff; border-radius: 7px; cursor: pointer; font-size: 0.88rem; color: var(--muted); }
+.btn-cancel:hover { background: var(--bg); }
+.btn-save { padding: 9px 22px; background: var(--primary); color: #fff; border: none; border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 0.88rem; }
+.btn-save:hover { background: var(--primary-dk); }
+.btn-danger { padding: 9px 18px; background: var(--alta); color: #fff; border: none; border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 0.88rem; }
+
+/* ── Responsive breakpoints ── */
+@media (min-width: 768px) {
+  .cards-wrap { display: none !important; }
+  .table-wrap { display: block !important; }
+}
+@media (max-width: 480px) {
+  .form-row { grid-template-columns: 1fr; }
+  .filters { gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📋 Control de Proyectos</h1>
+  <button class="btn-nueva" onclick="abrirModal()">+ Nueva Tarea</button>
+</header>
+
+<!-- Filtros -->
+<div class="filters">
+  <div class="filter-item">
+    <select id="filtroProyecto" onchange="renderVistas()">
+      <option value="">Todos los proyectos</option>
+    </select>
+  </div>
+  <div class="filter-item">
+    <select id="filtroPrioridad" onchange="renderVistas()">
+      <option value="">Toda prioridad</option>
+      <option>Alta</option><option>Media</option><option>Baja</option>
+    </select>
+  </div>
+  <div class="filter-item">
+    <select id="filtroEstado" onchange="renderVistas()">
+      <option value="">Todo estado</option>
+      <option>Pendiente</option><option>En curso</option><option>Testing</option><option>Completada</option>
+    </select>
+  </div>
+  <div class="filter-search">
+    <input type="text" id="filtroBuscar" placeholder="🔍 Buscar tarea o responsable…" oninput="renderVistas()"/>
+  </div>
+  <span class="badge-count" id="badgeCount"></span>
+</div>
+
+<!-- Leyenda -->
+<div class="leyenda">
+  <div class="ley-item"><div class="ley-dot" style="background:var(--pendiente-bg)"></div> Pendiente</div>
+  <div class="ley-item"><div class="ley-dot" style="background:var(--encurso-bg)"></div> En curso</div>
+  <div class="ley-item"><div class="ley-dot" style="background:var(--testing-bg)"></div> Testing</div>
+  <div class="ley-item"><div class="ley-dot" style="background:var(--completada-bg)"></div> Completada</div>
+  <div class="ley-item"><div class="ley-dot" style="background:#f9a825"></div> Vence pronto</div>
+  <div class="ley-item"><div class="ley-dot" style="background:#e53935"></div> Vence hoy/mañana</div>
+  <div class="ley-item"><div class="ley-dot" style="background:#b71c1c"></div> Vencida</div>
+</div>
+
+<!-- Loading -->
+<div id="loading" class="loading">Cargando tareas <span class="spinner"></span></div>
+
+<!-- MOBILE: Cards -->
+<div class="cards-wrap" id="cardsWrap" style="display:none"></div>
+
+<!-- DESKTOP: Tabla -->
+<div class="table-wrap" id="tableWrap" style="display:none">
+  <table>
+    <thead>
+      <tr>
+        <th>Proyecto</th><th>Tarea</th><th>Prioridad</th>
+        <th>Responsable</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+<div id="empty" class="empty" style="display:none">No hay tareas que coincidan con los filtros.</div>
+
+<!-- Modal crear/editar -->
+<div class="overlay" id="overlay" onclick="cerrarSiOverlay(event)">
+  <div class="modal">
+    <h2 id="modalTitulo">Nueva Tarea</h2>
+    <input type="hidden" id="tareaId"/>
+    <div class="form-group">
+      <label>Proyecto *</label>
+      <input id="fProyecto" placeholder="Nombre del proyecto" list="proyectosList"/>
+      <datalist id="proyectosList"></datalist>
+    </div>
+    <div class="form-group">
+      <label>Nombre de la tarea *</label>
+      <input id="fNombre" placeholder="¿Qué hay que hacer?"/>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <textarea id="fDescripcion" placeholder="Detalles opcionales…"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Prioridad</label>
+        <select id="fPrioridad"><option>Alta</option><option selected>Media</option><option>Baja</option></select>
+      </div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select id="fEstado"><option>Pendiente</option><option>En curso</option><option>Testing</option><option>Completada</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Responsable</label>
+        <input id="fResponsable" placeholder="Nombre o email"/>
+      </div>
+      <div class="form-group">
+        <label>Fecha de vencimiento</label>
+        <input id="fFecha" type="date"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardarTarea()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal eliminar -->
+<div class="overlay" id="overlayDel" onclick="cerrarSiOverlayDel(event)">
+  <div class="modal" style="max-width:340px;text-align:center">
+    <h2 style="color:var(--alta)">⚠️ Eliminar tarea</h2>
+    <p style="margin:14px 0;color:#4a5568">¿Estás seguro? Esta acción no se puede deshacer.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:10px">
+      <button class="btn-cancel" onclick="cerrarModalDel()">Cancelar</button>
+      <button class="btn-danger" id="btnConfirmarDel">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  PEGÁ ACÁ LA URL DE TU DEPLOY DE APPS SCRIPT
+// ============================================================
+const API_URL = "https://script.google.com/macros/s/AKfycbysFPBrNtLOmVjcCiw0j1N4_-GuSPzvWSlE_OgwYduNpV-q7HkJ74mBGZibCUp70B2V/exec";
+// ============================================================
+
+let tareas = [];
+
+// ── Init ──
+window.onload = () => {
+  if (!API_URL || API_URL.includes("TU_URL_AQUI")) {
+    document.getElementById("loading").innerHTML =
+      `<div style="color:#e74c3c;font-size:1rem">
+        ⚠️ Falta configurar la URL.<br>
+        <span style="font-size:.85rem;color:#718096">
+          Abrí el archivo <strong>index.html</strong> en VS Code y reemplazá
+          <code style="background:#f0f4f8;padding:2px 6px;border-radius:4px">TU_URL_AQUI</code>
+          con la URL de tu deploy de Apps Script.
+        </span>
+      </div>`;
+    return;
+  }
+  cargarTareas();
+};
+
+// ── API via fetch ──
+async function apiGet(action) {
+  const res = await fetch(`${API_URL}?action=${action}`, { redirect: "follow" });
+  return res.json();
+}
+
+async function apiPost(data) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    redirect: "follow",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  });
+  return res.json();
+}
+
+async function cargarTareas() {
+  try {
+    const data = await apiGet("getTareas");
+    tareas = data;
+    actualizarFiltroProyectos();
+    renderVistas();
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("cardsWrap").style.display = "flex";
+    document.getElementById("tableWrap").style.display = "block";
+  } catch(err) {
+    document.getElementById("loading").textContent = "Error al cargar. Verificá la URL. " + err.message;
+  }
+}
+
+// ── Proyectos ──
+function actualizarFiltroProyectos() {
+  const proyectos = [...new Set(tareas.map(t => t.proyecto).filter(Boolean))].sort();
+  const sel = document.getElementById("filtroProyecto");
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Todos los proyectos</option>';
+  proyectos.forEach(p => {
+    const o = document.createElement("option");
+    o.value = p; o.textContent = p;
+    if (p === val) o.selected = true;
+    sel.appendChild(o);
+  });
+  const dl = document.getElementById("proyectosList");
+  dl.innerHTML = "";
+  proyectos.forEach(p => { const o = document.createElement("option"); o.value = p; dl.appendChild(o); });
+}
+
+// ── Filtrar ──
+function filtrar() {
+  const fp  = document.getElementById("filtroProyecto").value;
+  const fpr = document.getElementById("filtroPrioridad").value;
+  const fe  = document.getElementById("filtroEstado").value;
+  const fb  = document.getElementById("filtroBuscar").value.toLowerCase();
+  return tareas.filter(t => {
+    if (fp  && t.proyecto  !== fp)  return false;
+    if (fpr && t.prioridad !== fpr) return false;
+    if (fe  && t.estado    !== fe)  return false;
+    if (fb  && !t.nombre.toLowerCase().includes(fb) && !t.responsable.toLowerCase().includes(fb)) return false;
+    return true;
+  });
+}
+
+// ── Semáforo de fecha ──
+function infoFecha(t) {
+  if (!t.fechaVencimiento) return { str: '<span style="color:#aaa">—</span>', rowExtra: "" };
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const fv  = new Date(t.fechaVencimiento + "T00:00:00");
+  const dias = Math.ceil((fv - hoy) / 86400000);
+  const fmt  = formatFecha(t.fechaVencimiento);
+
+  // Completada: sin alerta, solo info
+  if (t.estado === "Completada") {
+    if (dias < 0) return { str: `<span style="opacity:.75">✅ ${fmt} (entregada tarde)</span>`, rowExtra: "" };
+    return { str: `<span>✅ ${fmt}</span>`, rowExtra: "" };
+  }
+
+  // Testing con fecha pasada: en revisión, no "vencida"
+  if (t.estado === "Testing" && dias < 0) {
+    return { str: `<span style="color:#8e44ad;font-weight:700">🔬 ${fmt} (en revisión)</span>`, rowExtra: "" };
+  }
+
+  // En curso con fecha pasada: atrasada pero activa
+  if (t.estado === "En curso" && dias < 0) {
+    return { str: `<span style="color:#ca6f1e;font-weight:700">⏳ ${fmt} (atrasada ${Math.abs(dias)}d)</span>`, rowExtra: "venc-urgente-row" };
+  }
+
+  // Pendiente/cualquier otro con fecha pasada: vencida sin actividad
+  if (dias < 0)    return { str: `<span class="venc-vencida-w">🔴 ${fmt} (venció hace ${Math.abs(dias)}d)</span>`, rowExtra: "venc-vencida-row" };
+  if (dias === 0)  return { str: `<span class="venc-critico-w">🔴 ${fmt} (¡hoy!)</span>`,                          rowExtra: "venc-critico-row" };
+  if (dias <= 2)   return { str: `<span class="venc-critico-w">🔴 ${fmt} (${dias}d)</span>`,                       rowExtra: "venc-critico-row" };
+  if (dias <= 5)   return { str: `<span class="venc-urgente-w">🟠 ${fmt} (${dias}d)</span>`,                       rowExtra: "venc-urgente-row" };
+  if (dias <= 10)  return { str: `<span class="venc-pronto">🟡 ${fmt} (${dias}d)</span>`,                          rowExtra: "" };
+  return               { str: `<span class="venc-ok">🟢 ${fmt} (${dias}d)</span>`,                                 rowExtra: "" };
+}
+
+// ── Clase CSS del estado (sin espacios) ──
+function estClass(estado) {
+  return "est-" + estado.replace(/ /g, "-");
+}
+
+// ── Render ambas vistas ──
+function renderVistas() {
+  const filtradas = filtrar();
+  document.getElementById("badgeCount").textContent = filtradas.length + " tarea(s)";
+  renderCards(filtradas);
+  renderTabla(filtradas);
+  const hayVacio = filtradas.length === 0;
+  document.getElementById("empty").style.display = hayVacio ? "block" : "none";
+}
+
+// ── Cards (mobile) ──
+function renderCards(filtradas) {
+  const wrap = document.getElementById("cardsWrap");
+  wrap.innerHTML = "";
+  filtradas.forEach(t => {
+    const { str: fechaStr, rowExtra } = infoFecha(t);
+    const ec = estClass(t.estado);
+    const extraCls = rowExtra || ec;
+
+    const card = document.createElement("div");
+    card.className = `task-card ${extraCls}`;
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-title">${esc(t.nombre)}</div>
+          ${t.descripcion ? `<div class="card-desc">${esc(t.descripcion)}</div>` : ""}
+        </div>
+        <span class="badge badge-${t.prioridad}">${t.prioridad}</span>
+      </div>
+      <div class="card-body">
+        <div class="card-meta">📁 ${esc(t.proyecto)}</div>
+        ${t.responsable ? `<div class="card-meta">👤 ${esc(t.responsable)}</div>` : ""}
+        <div class="card-meta">📅 ${fechaStr}</div>
+      </div>
+      <div class="card-footer">
+        <select class="estado-sel sel-${t.estado.replace(/ /g,"-")}"
+          onchange="cambiarEstado('${t.id}', this.value, this)">
+          ${["Pendiente","En curso","Testing","Completada"].map(s =>
+            `<option ${s===t.estado?"selected":""}>${s}</option>`
+          ).join("")}
+        </select>
+        <div class="actions">
+          <button class="btn-icon" onclick="abrirEditar('${t.id}')" title="Editar">✏️</button>
+          <button class="btn-icon" onclick="confirmarEliminar('${t.id}')" title="Eliminar">🗑️</button>
+        </div>
+      </div>`;
+    wrap.appendChild(card);
+  });
+}
+
+// ── Tabla (desktop) ──
+function renderTabla(filtradas) {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  filtradas.forEach(t => {
+    const { str: fechaStr, rowExtra } = infoFecha(t);
+    const ec = estClass(t.estado);
+
+    const tr = document.createElement("tr");
+    tr.className = rowExtra ? `${ec} ${rowExtra}` : ec;
+    tr.innerHTML = `
+      <td><strong>${esc(t.proyecto)}</strong></td>
+      <td>
+        <div style="font-weight:600">${esc(t.nombre)}</div>
+        ${t.descripcion ? `<div style="font-size:.77rem;color:rgba(0,0,0,.5);margin-top:2px">${esc(t.descripcion)}</div>` : ""}
+      </td>
+      <td><span class="badge badge-${t.prioridad}">${t.prioridad}</span></td>
+      <td>${esc(t.responsable)||'<span style="color:#aaa">—</span>'}</td>
+      <td>${fechaStr}</td>
+      <td>
+        <select class="estado-sel sel-${t.estado.replace(/ /g,"-")}"
+          onchange="cambiarEstado('${t.id}', this.value, this)">
+          ${["Pendiente","En curso","Testing","Completada"].map(s =>
+            `<option ${s===t.estado?"selected":""}>${s}</option>`
+          ).join("")}
+        </select>
+      </td>
+      <td>
+        <div class="actions">
+          <button class="btn-icon" onclick="abrirEditar('${t.id}')" title="Editar">✏️</button>
+          <button class="btn-icon" onclick="confirmarEliminar('${t.id}')" title="Eliminar">🗑️</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Cambiar estado: INMEDIATO en el DOM, luego guarda ──
+function cambiarEstado(id, nuevoEstado, selectEl) {
+  // 1. Actualizar el array local
+  const t = tareas.find(x => x.id === id);
+  if (!t) return;
+  t.estado = nuevoEstado;
+
+  // 2. Actualizar color del select
+  const sel = selectEl;
+  sel.className = `estado-sel sel-${nuevoEstado.replace(/ /g,"-")}`;
+
+  // 3. Actualizar color de la fila/card INMEDIATAMENTE
+  const row = sel.closest("tr") || sel.closest(".task-card");
+  if (row) {
+    // Quitar todas las clases de estado
+    ["est-Pendiente","est-En-curso","est-Testing","est-Completada",
+     "venc-urgente-row","venc-critico-row","venc-vencida-row"].forEach(c => row.classList.remove(c));
+    // Agregar la nueva
+    row.classList.add(estClass(nuevoEstado));
+  }
+
+  // 4. Guardar en el servidor (en background)
+  apiPost({ action: "cambiarEstado", id, estado: nuevoEstado });
+}
+
+// ── Modal crear ──
+function abrirModal() {
+  document.getElementById("modalTitulo").textContent = "Nueva Tarea";
+  document.getElementById("tareaId").value = "";
+  ["fProyecto","fNombre","fDescripcion","fResponsable","fFecha"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("fPrioridad").value = "Media";
+  document.getElementById("fEstado").value = "Pendiente";
+  document.getElementById("overlay").classList.add("open");
+}
+
+function abrirEditar(id) {
+  const t = tareas.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById("modalTitulo").textContent = "Editar Tarea";
+  document.getElementById("tareaId").value        = t.id;
+  document.getElementById("fProyecto").value      = t.proyecto;
+  document.getElementById("fNombre").value        = t.nombre;
+  document.getElementById("fDescripcion").value   = t.descripcion;
+  document.getElementById("fPrioridad").value     = t.prioridad;
+  document.getElementById("fResponsable").value   = t.responsable;
+  document.getElementById("fFecha").value         = t.fechaVencimiento;
+  document.getElementById("fEstado").value        = t.estado;
+  document.getElementById("overlay").classList.add("open");
+}
+
+function cerrarModal() { document.getElementById("overlay").classList.remove("open"); }
+function cerrarSiOverlay(e) { if (e.target.id === "overlay") cerrarModal(); }
+
+function guardarTarea() {
+  const nombre   = document.getElementById("fNombre").value.trim();
+  const proyecto = document.getElementById("fProyecto").value.trim();
+  if (!nombre)   { alert("El nombre de la tarea es obligatorio."); return; }
+  if (!proyecto) { alert("El proyecto es obligatorio."); return; }
+  const tarea = {
+    id:               document.getElementById("tareaId").value,
+    proyecto,
+    nombre,
+    descripcion:      document.getElementById("fDescripcion").value.trim(),
+    prioridad:        document.getElementById("fPrioridad").value,
+    responsable:      document.getElementById("fResponsable").value.trim(),
+    fechaVencimiento: document.getElementById("fFecha").value,
+    estado:           document.getElementById("fEstado").value
+  };
+  const esEdicion = !!tarea.id;
+  cerrarModal();
+  apiPost({ action: esEdicion ? "editarTarea" : "crearTarea", tarea })
+    .then(() => cargarTareas())
+    .catch(err => alert("Error: " + err.message));
+}
+
+// ── Eliminar ──
+function confirmarEliminar(id) {
+  document.getElementById("overlayDel").classList.add("open");
+  document.getElementById("btnConfirmarDel").onclick = () => {
+    cerrarModalDel();
+    apiPost({ action: "eliminarTarea", id })
+      .then(() => cargarTareas())
+      .catch(err => alert("Error: " + err.message));
+  };
+}
+function cerrarModalDel() { document.getElementById("overlayDel").classList.remove("open"); }
+function cerrarSiOverlayDel(e) { if (e.target.id === "overlayDel") cerrarModalDel(); }
+
+// ── Utils ──
+function esc(str) {
+  if (!str) return "";
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function formatFecha(iso) {
+  if (!iso) return "";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+</script>
+</body>
+</html>
